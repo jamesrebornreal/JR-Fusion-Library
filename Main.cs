@@ -24,10 +24,15 @@ using LabFusion.Player;
 using LabFusion.Representation;
 using LabFusion.RPC;
 using LabFusion.Scene;
+using LabFusion.SDK.Metadata;
+using LabFusion.UI.Popups;
 using MelonLoader;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
+using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 using static LabFusion.RPC.NetworkAssetSpawner;
 [assembly: MelonInfo(typeof(BoneLib.BuildInfo), BoneLib.BuildInfo.Name, BoneLib.BuildInfo.Version, BoneLib.BuildInfo.Author)]
@@ -82,24 +87,24 @@ namespace FusionLibrary
 
         }
     public static class HandExtensions
-        {
-            public static SpawnGun JR_HandGrabbedSpawnGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponentInChildren<SpawnGun>();
-            public static bool JR_IsGrabbedSpawnGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponentInChildren<SpawnGun>() != null;
-            public static FlyingGun JR_HandGrabbedNimbusGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<FlyingGun>();
-            public static bool JR_IsGrabbedNimbusGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<FlyingGun>() != null;
-            public static AIBrain JR_IsHandGrabbedNPCAIBrain(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<AIBrain>();
-            public static bool JR_IsHandGrabbingNPC(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<AIBrain>() != null;
-            public static bool JR_IsHandGrabbingAnyNetPlayer(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<RigManager>() != null;
-            public static bool JR_IsHandGrabbingNetPlayer(this Hand Handnow, NetworkPlayer PlayerNow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<RigManager>() == PlayerNow?.RigRefs?.RigManager;
-            public static bool JR_IsHandGrabbingYou(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<RigManager>() == Player.RigManager;
-            public static GameObject JR_GetAttachedObject(this Hand Handnow) => Handnow?.m_CurrentAttachedGO;
-            public static MarrowEntity JR_GetMarrowEntity(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<MarrowEntity>();
-            public static Gun JR_GetGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<Gun>();
-            public static bool JR_HasGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<Gun>() != null;
-            public static StabSlash JR_GetMelee(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<StabSlash>();
-            public static bool JR_HasMelee(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<StabSlash>() != null;
+    {
+        public static SpawnGun JR_HandGrabbedSpawnGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponentInChildren<SpawnGun>();
+        public static bool JR_IsGrabbedSpawnGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponentInChildren<SpawnGun>() != null;
+        public static FlyingGun JR_HandGrabbedNimbusGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<FlyingGun>();
+        public static bool JR_IsGrabbedNimbusGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<FlyingGun>() != null;
+        public static AIBrain JR_IsHandGrabbedNPCAIBrain(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<AIBrain>();
+        public static bool JR_IsHandGrabbingNPC(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<AIBrain>() != null;
+        public static bool JR_IsHandGrabbingAnyNetPlayer(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<RigManager>() != null;
+        public static bool JR_IsHandGrabbingNetPlayer(this Hand Handnow, NetworkPlayer PlayerNow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<RigManager>() == PlayerNow?.RigRefs?.RigManager;
+        public static bool JR_IsHandGrabbingYou(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<RigManager>() == Player.RigManager;
+        public static GameObject JR_GetAttachedObject(this Hand Handnow) => Handnow?.m_CurrentAttachedGO;
+        public static MarrowEntity JR_GetMarrowEntity(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<MarrowEntity>();
+        public static Gun JR_GetGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<Gun>();
+        public static bool JR_HasGun(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<Gun>() != null;
+        public static StabSlash JR_GetMelee(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<StabSlash>();
+        public static bool JR_HasMelee(this Hand Handnow) => Handnow?.JR_GetAttachedObject()?.transform?.root?.GetComponent<StabSlash>() != null;
 
-        }
+    }
     public static class NetworkEntityExtensions
         {
 
@@ -336,7 +341,7 @@ namespace FusionLibrary
             if (FusionLibrary.IsAvatarCrateExist(idnow))
                 return FusionLibrary.StripColorTags(new AvatarCrateReference(idnow)?.Crate?.name);
 
-            if (FusionLibrary.  IsLevelCrateExist(idnow))
+            if (FusionLibrary.IsLevelCrateExist(idnow))
                 return FusionLibrary.StripColorTags(new LevelCrateReference(idnow)?.Crate?.name);
 
             if (FusionLibrary.IsSpawnableCrateExist(idnow))
@@ -377,9 +382,103 @@ namespace FusionLibrary
     }
     //
 
+    //able to create individual timer objects 
+    public class SimpleTimer
+    {
+        public System.Action? _codenow;
+        public float _mins;
+        public object? _coroutine;
+
+        private bool _quicker;
+        private float _quickerSeconds;
+
+        private bool _running;
+
+        public SimpleTimer(System.Action codenow, float mins)
+        {
+            _codenow = codenow ?? throw new System.ArgumentNullException(nameof(codenow));
+            _mins = mins;
+        }
+
+        public SimpleTimer Start(bool quicker = false, float quickerseconds = 10f)
+        {
+            Stop();
+
+            _quicker = quicker;
+            _quickerSeconds = quickerseconds;
+
+            _running = true;
+            _coroutine = MelonCoroutines.Start(RunEveryXMins());
+
+            return this;
+        }
+
+        public void Stop()
+        {
+            _running = false;
+
+            if (_coroutine != null)
+            {
+                try
+                {
+                    MelonCoroutines.Stop(_coroutine);
+                }
+                catch { }
+
+                _coroutine = null;
+            }
+        }
+
+        public void Refresh(System.Action? newAction = null, float? newMins = null)
+        {
+            Stop();
+
+            if (newAction != null)
+                _codenow = newAction;
+
+            if (newMins.HasValue)
+                _mins = newMins.Value;
+
+            Start(_quicker, _quickerSeconds);
+
+            MelonLogger.Warning("Timer refreshed, first execution will happen after interval.");
+        }
+
+        public System.Collections.IEnumerator RunEveryXMins()
+        {
+            while (_running)
+            {
+                float waitTime = _quicker ? _quickerSeconds : _mins * 60f;
+
+                yield return new WaitForSecondsRealtime(waitTime);
+
+                if (!_running)
+                    yield break;
+
+                try
+                {
+                    var action = _codenow;
+
+                    if (action == null)
+                        continue;
+
+                    action.Invoke();
+                }
+                catch (System.NullReferenceException)
+                {
+                    MelonLogger.Warning("Timer skipped null Unity reference (object destroyed).");
+                }
+                catch (System.Exception ex)
+                {
+                    MelonLogger.Error($"Timer error: {ex}");
+                }
+            }
+        }
+    }
+
+
     public class FusionLibrary : MelonMod
     {
-        public static handnow handnowreal = handnow.Right;
 
         //returns active hand
         public static Hand JR_YourGetHand(WhichHand hand)
@@ -395,6 +494,8 @@ namespace FusionLibrary
                 _ => null
             };
         }
+       
+
         //magazine checkers (attempt could be better but it is where its at right now which is fine for me :) )
         public static bool IsMagazine(SpawnableCrateReference reffy)
         {
@@ -487,6 +588,7 @@ namespace FusionLibrary
             return matches;
         }
         //
+
 
         //returns your active steam id
         public static ulong SteamIdYours()
@@ -1150,11 +1252,241 @@ namespace FusionLibrary
             }
         }
         //returns the barcode currently in both hands
-        public static string BarcodeInHand()
+        public static string BarcodeInHand() => JR_YourGetHand(WhichHand.Left)?.JR_GetMarrowEntity()?.JR_GetBarcodeID() ?? JR_YourGetHand(WhichHand.Right)?.JR_GetMarrowEntity()?.JR_GetBarcodeID() ?? string.Empty;
+        
+        
+        //unloads and uninstalls mod by pallet
+        public static void DeleteModioMod(Pallet PalletNow, bool notif = true)
         {
-            var hand = handnowreal == handnow.Left ? WhichHand.Left : WhichHand.Right;
-            var entity = JR_YourGetHand(hand)?.JR_GetMarrowEntity();
-            return entity != null ? entity.JR_GetBarcodeID() : string.Empty;
+            if (CrateFilterer.GetModID(PalletNow) != -1)
+            {
+
+                var (folder, manif, fullpal, manny) = GetPalletFolder(PalletNow?.name);
+
+                if (!string.IsNullOrEmpty(folder) && System.IO.Directory.Exists(folder))
+                {
+                    UnloadPallet(PalletNow);
+                    System.IO.Directory.Delete(folder, true);
+                    System.IO.File.Delete(manif);
+                    if (notif)
+                        NotificationNow(BuildInfo.Name, $"Deleted {PalletNow?.name}.", NotificationType.ERROR, 3.0f);
+                }
+            }
         }
+        public static void UnloadPallet(Pallet pallet)
+        {
+            if (pallet == null)
+                return;
+
+            var bundles = pallet._packedAssets;
+            if (bundles != null)
+            {
+                foreach (var bundle in bundles)
+                {
+                    bundle?.marrowAsset.UnloadAsset(true);
+                }
+            }
+
+            AssetWarehouse.Instance.UnloadPallet(pallet);
+
+            MelonLogger.Msg($"Unloaded pallet: {pallet.Title}");
+        }
+        public static (string folderpath, string manifestpath, string fullpallet, PalletManifest palletm) GetPalletFolder(string palletTitle, bool openSelectionPc = false)
+        {
+            var manifests = AssetWarehouse.Instance?.GetPalletManifests()?.ToArray();
+            if (manifests == null)
+                return (null, null, null, null);
+
+            var pallet = manifests
+                .FirstOrDefault(m => m.Pallet != null && m.Pallet.Title == palletTitle);
+
+            if (pallet?.PalletPath == null)
+                return (null, null, null, null);
+
+            string folderPath = Path.GetDirectoryName(pallet.PalletPath);
+            if (openSelectionPc && System.IO.Directory.Exists(folderPath))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{folderPath}\"");
+                NotificationNow(BuildInfo.Name, $"Opened {palletTitle} download folder.", NotificationType.SUCCESS, 2f);
+            }
+
+            return (folderPath, pallet.ManifestPath, pallet.PalletPath, pallet);
+        }
+        //
+
+
+        //hide holsters for specific players
+        public static void HolsterHiderAll(NetworkPlayer playerTodo, bool activeNow = false)
+        {
+            var rig = playerTodo != null
+                ? playerTodo.RigRefs?.RigManager?.physicsRig
+                : Player.RigManager?.physicsRig;
+
+            if (rig == null) return;
+
+            void Toggle(Transform root, string path)
+            {
+                if (root == null) return;
+                var t = root.Find(path);
+                if (t == null) return;
+                var mr = t.GetComponent<UnityEngine.MeshRenderer>();
+                mr?.gameObject.SetActive(activeNow);
+            }
+
+            Toggle(rig.m_spine?.transform, "SideRt/prop_handGunHolster/strap_geo");
+            Toggle(rig.m_spine?.transform, "SideRt/prop_handGunHolster/handgunHolster_geo");
+            Toggle(rig.m_spine?.transform, "SideLf/prop_handGunHolster/strap_geo");
+            Toggle(rig.m_spine?.transform, "SideLf/prop_handGunHolster/handgunHolster_geo");
+            Toggle(rig.m_pelvis?.transform, "BeltLf1/InventoryAmmoReceiver/Holder");
+            Toggle(rig.m_pelvis?.transform, "BeltRt1/InventoryAmmoReceiver/Holder");
+            Toggle(rig.m_pelvis?.transform, "BackCt/prop_pouch");
+        }
+        //just reads and outputs your current modio token to a string
+        public static string? ReadModIOToken()
+        {
+            try
+            {
+                string settingsPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "AppData",
+                    "LocalLow",
+                    "Stress Level Zero",
+                    "BONELAB",
+                    "mod_settings.json"
+                );
+
+                if (!File.Exists(settingsPath))
+                    return null;
+
+                string jsonText = File.ReadAllText(settingsPath);
+
+                JObject settingsJson = JObject.Parse(jsonText);
+
+                return settingsJson.SelectToken("mod.io.access_token")?.ToString();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to read Mod.io token: {ex.Message}");
+                return null;
+            }
+        }
+        
+        //this function dumps all pallets to a neat format on your pc
+        private static bool _isDumpRunning = false;
+        public static IEnumerator DumpPalletsCoroutine(string PalletDumpLocation)
+        {
+            if (_isDumpRunning)
+            {
+                MelonLogger.Error("⚠️ Crate dump is already running!");
+                yield break;
+            }
+
+            _isDumpRunning = true;
+            MelonLogger.Warning("🔍 Starting crate dump...");
+
+            StringBuilder sb = new();
+
+            var pallets = AssetWarehouse.Instance.GetPallets();
+            int batchSize = 150;
+            int processedCrates = 0;
+
+            int totalCrates = 0;
+            foreach (var pallet in pallets)
+                if (pallet.Crates != null)
+                    totalCrates += pallet.Crates.Count;
+
+            foreach (var pallet in pallets)
+            {
+                sb.AppendLine($"[Pallet] {StripColorTags(pallet.Title)} (Author: {pallet.Author})");
+
+                if (pallet.Crates == null) continue;
+
+                foreach (var cratey in pallet.Crates)
+                {
+                    if (cratey.Tags == null) continue;
+
+                    sb.AppendLine($"  └── [Crate] {StripColorTags(cratey.Title)}");
+                    sb.AppendLine($"      └── Barcode: {cratey.Barcode.ID}");
+
+                    var tagsSet = new System.Collections.Generic.HashSet<string>();
+                    foreach (var tag in cratey.Tags)
+                        tagsSet.Add(tag);
+
+                    if (tagsSet.Count > 0)
+                        sb.AppendLine($"      └── Tags: {string.Join(", ", tagsSet)}");
+
+                    processedCrates++;
+
+                    if (processedCrates % batchSize == 0)
+                    {
+                        int barLength = 30;
+                        float progress = (float)processedCrates / totalCrates;
+                        int filled = (int)(progress * barLength);
+                        string bar = $"[{new string('#', filled)}{new string('-', barLength - filled)}] {progress:P1}";
+                        MelonLogger.Warning($"⏳ Dumping crates... {bar}");
+
+                        yield return new WaitForSeconds(0.1f);
+                    }
+                }
+
+                sb.AppendLine();
+            }
+
+            MelonLogger.Warning("⏳ Dumping crates... [##############################] 100%");
+
+            try
+            {
+                File.WriteAllText(PalletDumpLocation, sb.ToString());
+                MelonLogger.Warning($"✅ Crate dump written to: {PalletDumpLocation}");
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd",
+                    Arguments = $"/c start \"\" \"{PalletDumpLocation}\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Failed to write pallet dump: {ex.Message}");
+            }
+
+            _isDumpRunning = false;
+        }
+        //outputs a randomly selected player with custom excludes
+        public static NetworkPlayer GetRandomOtherPlayer(NetworkPlayer excludeCertainPlayer = null, PlayerID excludecertainplayerid = null)
+        {
+            var me = JR_YourNetworkPlayer();
+            var others = new System.Collections.Generic.HashSet<NetworkPlayer>();
+
+            foreach (var player in NetworkPlayers())
+            {
+                if (player != me && player != excludeCertainPlayer && player.PlayerID != excludecertainplayerid)
+                    others.Add(player);
+            }
+
+            return others.ElementAt(new System.Random().Next(others.Count));
+        }
+        //returns your playerid class
+        public static PlayerID JR_YourPlayerID()
+        {
+            return PlayerIDManager.LocalID;
+        }   
+        //returns your unique smallid from your current lobby
+        public static byte JR_YourSmallID()
+        {
+            return PlayerIDManager.LocalID.SmallID;
+        }      
+        //returns your networkmetadata class where your profile info is stored so you can edit it accordingly
+        public static NetworkMetadata JR_YourMetaData()
+        {
+
+            return LocalPlayer.Metadata.Metadata;
+        }
+    
+    
+    
+    
     }
 }

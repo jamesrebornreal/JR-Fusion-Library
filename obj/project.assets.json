@@ -14,11 +14,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\lacey\\Desktop\\JRFusionLibrary\\FusionLibrary.csproj",
+      "projectUniqueName": "C:\\Users\\lacey\\Desktop\\JRFusionLibrary\\JR Fusion Library\\FusionLibrary.csproj",
       "projectName": "FusionLibrary",
-      "projectPath": "C:\\Users\\lacey\\Desktop\\JRFusionLibrary\\FusionLibrary.csproj",
+      "projectPath": "C:\\Users\\lacey\\Desktop\\JRFusionLibrary\\JR Fusion Library\\FusionLibrary.csproj",
       "packagesPath": "C:\\Users\\lacey\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\lacey\\Desktop\\JRFusionLibrary\\obj\\",
+      "outputPath": "C:\\Users\\lacey\\Desktop\\JRFusionLibrary\\JR Fusion Library\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
