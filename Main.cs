@@ -1,4 +1,5 @@
 ﻿using BoneLib;
+using FusionLibrary;
 using Il2CppSLZ.Bonelab;
 using Il2CppSLZ.Bonelab.SaveData;
 using Il2CppSLZ.Marrow;
@@ -10,7 +11,6 @@ using Il2CppSLZ.Marrow.PuppetMasta;
 using Il2CppSLZ.Marrow.SaveData;
 using Il2CppSLZ.Marrow.VFX;
 using Il2CppSLZ.Marrow.Warehouse;
-using Il2CppSystem.Diagnostics;
 using Il2CppSystem.Text.RegularExpressions;
 using LabFusion.Data;
 using LabFusion.Downloading;
@@ -23,31 +23,31 @@ using LabFusion.Network;
 using LabFusion.Player;
 using LabFusion.Representation;
 using LabFusion.RPC;
+using LabFusion.Safety;
 using LabFusion.Scene;
 using LabFusion.SDK.Metadata;
 using LabFusion.UI.Popups;
 using MelonLoader;
 using Newtonsoft.Json.Linq;
-using System;
 using System.Collections;
-using System.IO;
-using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using UnityEngine;
+using UnityEngine.Networking;
 using static LabFusion.RPC.NetworkAssetSpawner;
-[assembly: MelonInfo(typeof(BoneLib.BuildInfo), BoneLib.BuildInfo.Name, BoneLib.BuildInfo.Version, BoneLib.BuildInfo.Author)]
+[assembly: MelonInfo(typeof(FusionLibrary.LibraryCode), JRLibraryInfo.LibraryName, JRLibraryInfo.Version, JRLibraryInfo.LibraryCreator)]
 [assembly: MelonGame("Stress Level Zero", "BONELAB")]
 namespace FusionLibrary
 {
-    public static class BuildInfo
+    internal static class JRLibraryInfo
     {
-        public const string Name = "JR Fusion Library";
-        public const string Description = "A bunch of Fusion functions I made over time for Fusion Protector and other projects to help developers create code mods and enhance the Fusion experience."; // Description for the Mod.  (Set as null if none)
-        public const string Author = "James Reborn";
+
+        public const string LibraryName = "JR Fusion Library";
+        public const string LibraryCreator = "James Reborn";
         public const string Version = "1.0.0";
 
     }
-
     public enum handnow
     {
         Left,
@@ -108,7 +108,7 @@ namespace FusionLibrary
     public static class NetworkEntityExtensions
         {
 
-            public static void JR_Despawn(this NetworkEntity entity) =>FusionLibrary.DespawnNow(entity);
+            public static void JR_Despawn(this NetworkEntity entity) => LibraryCode.DespawnNow(entity);
             public static bool JR_IsNetPlayer(this NetworkEntity entity) => entity?.JR_GetMarrowEntity() != null && (entity.JR_GetMarrowEntity()?.JR_IsNetPlayer() ?? false);
             public static bool JR_IsMagazine(this NetworkEntity entity)
             {
@@ -166,7 +166,7 @@ namespace FusionLibrary
         {
             public static bool IsMe(this NetworkPlayer player)
             {
-                return player.JR_SteamID() == FusionLibrary.SteamIdYours();
+                return player.JR_SteamID() == LibraryCode.SteamIdYours();
             }
             public static PullCordDevice JR_PlayersBodyLog(this NetworkPlayer player)
             {
@@ -333,47 +333,100 @@ namespace FusionLibrary
                     _ => false
                 };
             }
+            //clear constraints on a player (owner only locked to prevent abuse)
+            public static void ClearConstraints(this NetworkPlayer Netty)
+        {
+            if (LibraryCode.AreYouOWNER())
+            {
+                if (!Netty.PlayerID.IsValid)
+                {
+                    return;
+                }
+
+                try
+                {
+                    foreach (ConstraintTracker componentsInChild in Netty.RigRefs.RigManager.physicsRig.GetComponentsInChildren<ConstraintTracker>())
+                    {
+                        componentsInChild.DeleteConstraint();
+                    }
+                }
+                catch
+                {
+
+                }
+            }
         }
+            //hide holsters for specific players
+            public static void HolsterHiderAll(this NetworkPlayer playerTodo, bool activeNow = false)
+        {
+            var rig = playerTodo != null
+                ? playerTodo.RigRefs?.RigManager?.physicsRig
+                : Player.RigManager?.physicsRig;
+
+            if (rig == null) return;
+
+            void Toggle(Transform root, string path)
+            {
+                if (root == null) return;
+                var t = root.Find(path);
+                if (t == null) return;
+                var mr = t.GetComponent<UnityEngine.MeshRenderer>();
+                mr?.gameObject.SetActive(activeNow);
+            }
+
+            Toggle(rig.m_spine?.transform, "SideRt/prop_handGunHolster/strap_geo");
+            Toggle(rig.m_spine?.transform, "SideRt/prop_handGunHolster/handgunHolster_geo");
+            Toggle(rig.m_spine?.transform, "SideLf/prop_handGunHolster/strap_geo");
+            Toggle(rig.m_spine?.transform, "SideLf/prop_handGunHolster/handgunHolster_geo");
+            Toggle(rig.m_pelvis?.transform, "BeltLf1/InventoryAmmoReceiver/Holder");
+            Toggle(rig.m_pelvis?.transform, "BeltRt1/InventoryAmmoReceiver/Holder");
+            Toggle(rig.m_pelvis?.transform, "BackCt/prop_pouch");
+        }
+
+
+
+
+    }
     public static class BarCodeIDExtensions
     {
         public static string JR_BarcodeCrateName(this string idnow)
         {
-            if (FusionLibrary.IsAvatarCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new AvatarCrateReference(idnow)?.Crate?.name);
+            if (LibraryCode.IsAvatarCrateExist(idnow))
+                return LibraryCode.StripColorTags(new AvatarCrateReference(idnow)?.Crate?.name);
 
-            if (FusionLibrary.IsLevelCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new LevelCrateReference(idnow)?.Crate?.name);
+            if (LibraryCode.IsLevelCrateExist(idnow))
+                return LibraryCode.StripColorTags(new LevelCrateReference(idnow)?.Crate?.name);
 
-            if (FusionLibrary.IsSpawnableCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new SpawnableCrateReference(idnow)?.Crate?.name);
+            if (LibraryCode.IsSpawnableCrateExist(idnow))
+                return LibraryCode.StripColorTags(new SpawnableCrateReference(idnow)?.Crate?.name);
 
             return "NULL";
         }
 
         public static string JR_BarcodePalletName(this string idnow)
         {
-            if (FusionLibrary.IsAvatarCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new AvatarCrateReference(idnow)?.Crate?.Pallet?.name);
+            if (LibraryCode.IsAvatarCrateExist(idnow))
+                return LibraryCode.StripColorTags(new AvatarCrateReference(idnow)?.Crate?.Pallet?.name);
 
-            if (FusionLibrary.IsLevelCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new LevelCrateReference(idnow)?.Crate?.Pallet?.name);
+            if (LibraryCode.IsLevelCrateExist(idnow))
+                return LibraryCode.StripColorTags(new LevelCrateReference(idnow)?.Crate?.Pallet?.name);
 
-            if (FusionLibrary.IsSpawnableCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new SpawnableCrateReference(idnow)?.Crate?.Pallet?.name);
+            if (LibraryCode.IsSpawnableCrateExist(idnow))
+                return LibraryCode.StripColorTags(new SpawnableCrateReference(idnow)?.Crate?.Pallet?.name);
 
             return "NULL";
         }
 
         public static string JR_BarcodeAuthor(this string idnow)
         {
-            if (FusionLibrary.IsAvatarCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new AvatarCrateReference(idnow)?.Crate?.Pallet?.Author);
+            if (LibraryCode.IsAvatarCrateExist(idnow))
+                return LibraryCode.StripColorTags(new AvatarCrateReference(idnow)?.Crate?.Pallet?.Author);
 
-            if (FusionLibrary.IsLevelCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new LevelCrateReference(idnow)?.Crate?.Pallet?.Author);
+            if (LibraryCode.IsLevelCrateExist(idnow))
+                return LibraryCode.StripColorTags(new LevelCrateReference(idnow)?.Crate?.Pallet?.Author);
 
-            if (FusionLibrary.IsSpawnableCrateExist(idnow))
-                return FusionLibrary.StripColorTags(new SpawnableCrateReference(idnow)?.Crate?.Pallet?.Author);
+            if (LibraryCode.IsSpawnableCrateExist(idnow))
+                return LibraryCode.StripColorTags(new SpawnableCrateReference(idnow)?.Crate?.Pallet?.Author);
 
             return "NULL";
         }
@@ -477,7 +530,7 @@ namespace FusionLibrary
     }
 
 
-    public class FusionLibrary : MelonMod
+    public class LibraryCode : MelonMod
     {
 
         //returns active hand
@@ -494,7 +547,42 @@ namespace FusionLibrary
                 _ => null
             };
         }
-       
+        //returns your current network player
+        public static NetworkPlayer JR_YourNetworkPlayer()
+        {
+            return LocalPlayer.GetNetworkPlayer();
+        }
+        //returns your active steam id
+        public static ulong SteamIdYours()
+        {
+            if (!Steamworks.SteamClient.IsValid || !Steamworks.SteamClient.IsLoggedOn)
+                return 0;
+
+            return Steamworks.SteamClient.SteamId.Value;
+        }
+        //reads site into string
+        public static IEnumerator ReadFromSite(string url,Action<string> callbackoftext)
+        {
+            UnityWebRequest request = UnityWebRequest.Get(url);
+
+            yield return request.SendWebRequest();
+
+#if UNITY_2020_2_OR_NEWER
+    if (request.result != UnityWebRequest.Result.Success)
+#else
+            if (request.isNetworkError || request.isHttpError)
+#endif
+            {
+                MelonLoader.MelonLogger.Error(request.error);
+            }
+            else
+            {
+                string text = request.downloadHandler.text;
+                callbackoftext?.Invoke(text);
+            }
+
+            request.Dispose(); // If available
+        }
 
         //magazine checkers (attempt could be better but it is where its at right now which is fine for me :) )
         public static bool IsMagazine(SpawnableCrateReference reffy)
@@ -590,14 +678,7 @@ namespace FusionLibrary
         //
 
 
-        //returns your active steam id
-        public static ulong SteamIdYours()
-        {
-            if (!Steamworks.SteamClient.IsValid || !Steamworks.SteamClient.IsLoggedOn)
-                return 0;
-
-            return Steamworks.SteamClient.SteamId.Value;
-        }
+        
         //strip colors from names to prevent weird html related stuff
         public static string StripColorTags(string input)
         {
@@ -675,11 +756,6 @@ namespace FusionLibrary
                    playerNow.PlayerID.IsHost &&
                    playerNow.IsMe();
         }
-        //returns your current network player
-        public static NetworkPlayer JR_YourNetworkPlayer()
-        {
-            return LocalPlayer.GetNetworkPlayer();
-        }
         //list of net entities with some filtered out because you dont wanna mess with some stuff
         public static System.Collections.Generic.HashSet<NetworkEntity> NetworkEntities()
         {
@@ -742,7 +818,7 @@ namespace FusionLibrary
                 OnAccepted = Accept,
                 OnDeclined = Decline,
                 Type = Type,
-                Tag = BuildInfo.Name
+                Tag = JRLibraryInfo.LibraryName
             });
         }
         //opens steam profile on pc
@@ -753,12 +829,12 @@ namespace FusionLibrary
             {
 
                 OpenPageNow(steamProfileUrl);
-                NotificationNow(BuildInfo.Name, "Opened Steam profile in browser.", LabFusion.UI.Popups.NotificationType.SUCCESS);
+                NotificationNow(JRLibraryInfo.LibraryName, "Opened Steam profile in browser.", LabFusion.UI.Popups.NotificationType.SUCCESS);
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"Failed to open URL: {ex.Message}");
-                NotificationNow(BuildInfo.Name, "Failed to open profile link.", LabFusion.UI.Popups.NotificationType.ERROR);
+                NotificationNow(JRLibraryInfo.LibraryName, "Failed to open profile link.", LabFusion.UI.Popups.NotificationType.ERROR);
             }
         }
         //the barcode string to your current avatar
@@ -868,7 +944,7 @@ namespace FusionLibrary
                 }
                 else
                 {
-                    NotificationNow(BuildInfo.Name, "Invalid Permissions!", LabFusion.UI.Popups.NotificationType.ERROR, 3.0f);
+                    NotificationNow(JRLibraryInfo.LibraryName, "Invalid Permissions!", LabFusion.UI.Popups.NotificationType.ERROR, 3.0f);
                     return null;
                 }
             }
@@ -1051,7 +1127,7 @@ namespace FusionLibrary
             if (_isLookingUpMod)
             {
                 NotificationNow(
-                    BuildInfo.Name,
+                    JRLibraryInfo.LibraryName,
                     $"Already looking up a mod please WAIT!",
                     LabFusion.UI.Popups.NotificationType.WARNING
                 );
@@ -1061,7 +1137,7 @@ namespace FusionLibrary
             _isLookingUpMod = true;
 
             NotificationNow(
-                BuildInfo.Name,
+                JRLibraryInfo.LibraryName,
                 $"Reading mod info for ID {modIOID}... please wait.",
                 LabFusion.UI.Popups.NotificationType.INFORMATION
             );
@@ -1080,7 +1156,7 @@ namespace FusionLibrary
                 if (info.Result != ModResult.SUCCEEDED)
                 {
                     NotificationNow(
-                        BuildInfo.Name,
+                        JRLibraryInfo.LibraryName,
                         "The content failed to install! Make sure you are logged into mod.io in VoidG114 or BONELAB Hub!",
                         LabFusion.UI.Popups.NotificationType.WARNING
                     );
@@ -1099,7 +1175,7 @@ namespace FusionLibrary
                 if (info.Result == ModResult.SUCCEEDED)
                 {
                     NotificationNow(
-                        BuildInfo.Name,
+                        JRLibraryInfo.LibraryName,
                         $"Mod found: {info.Data.NameID}",
                         LabFusion.UI.Popups.NotificationType.INFORMATION
                     );
@@ -1107,7 +1183,7 @@ namespace FusionLibrary
                 else
                 {
                     NotificationNow(
-                        BuildInfo.Name,
+                        JRLibraryInfo.LibraryName,
                         "Failed to retrieve mod info.",
                         LabFusion.UI.Popups.NotificationType.WARNING
                     );
@@ -1135,7 +1211,7 @@ namespace FusionLibrary
             if (noti)
             {
                 NotificationNow(
-                    BuildInfo.Name,
+                    JRLibraryInfo.LibraryName,
                     "Wait Until You See Installed Notification Then Press Whatever You Pressed AGAIN!",
                     LabFusion.UI.Popups.NotificationType.WARNING,
                     6.0f
@@ -1148,7 +1224,7 @@ namespace FusionLibrary
                 if (info.Result != ModResult.SUCCEEDED)
                 {
                     NotificationNow(
-                        BuildInfo.Name,
+                        JRLibraryInfo.LibraryName,
                         "The Content failed to install! Make sure you are logged into mod.io in VoidG114 or BONELAB Hub!",
                         LabFusion.UI.Popups.NotificationType.WARNING
                     );
@@ -1184,7 +1260,7 @@ namespace FusionLibrary
                 DataManager.ActiveSave.PlayerSettings.FavoriteAvatars[slotindex - 1] = avatarbarcode;
                 if (notification)
                 {
-                    NotificationNow(BuildInfo.Name, $"Changed {slotindex} Slot And Saved!", LabFusion.UI.Popups.NotificationType.SUCCESS);
+                    NotificationNow(JRLibraryInfo.LibraryName, $"Changed {slotindex} Slot And Saved!", LabFusion.UI.Popups.NotificationType.SUCCESS);
                 }
                 DataManager.TrySaveActiveSave(SaveFlags.Complete);
                 JR_BodyLog(Player.PhysicsRig).bodylogreturn.LoadFavoriteAvatars();
@@ -1192,32 +1268,10 @@ namespace FusionLibrary
             }
             else
             {
-                NotificationNow(BuildInfo.Name, "This Does Not Exist In Your Game Install This Mod For It To Exist...", LabFusion.UI.Popups.NotificationType.ERROR, 3.0f);
+                NotificationNow(JRLibraryInfo.LibraryName, "This Does Not Exist In Your Game Install This Mod For It To Exist...", LabFusion.UI.Popups.NotificationType.ERROR, 3.0f);
             }
         }
-        //clear constraints on a player (owner only locked to prevent abuse)
-        public static void ClearConstraints(NetworkPlayer Netty)
-        {
-            if (AreYouOWNER())
-            {
-                if (!Netty.PlayerID.IsValid)
-                {
-                    return;
-                }
-
-                try
-                {
-                    foreach (ConstraintTracker componentsInChild in Netty.RigRefs.RigManager.physicsRig.GetComponentsInChildren<ConstraintTracker>())
-                    {
-                        componentsInChild.DeleteConstraint();
-                    }
-                }
-                catch
-                {
-
-                }
-            }
-        }
+ 
         //if you dont have this modid installed then it auto installs it
         public static bool IfDontHaveInstallThenDo(string barcode, int modioID, bool notification = false)
         {
@@ -1245,8 +1299,8 @@ namespace FusionLibrary
                     spawnGun._selectedCrate = crateRef.Crate;
                     spawnGun.SetPreviewMesh();
 
-                    SpawnEffects.CallDespawnEffect(FusionLibrary.JR_YourGetHand(hand)?.JR_GetMarrowEntity());
-                    SpawnEffects.CallSpawnEffect(FusionLibrary.JR_YourGetHand(hand)?.JR_GetMarrowEntity());
+                    SpawnEffects.CallDespawnEffect(LibraryCode.JR_YourGetHand(hand)?.JR_GetMarrowEntity());
+                    SpawnEffects.CallSpawnEffect(LibraryCode.JR_YourGetHand(hand)?.JR_GetMarrowEntity());
 
                 }
             }
@@ -1269,7 +1323,7 @@ namespace FusionLibrary
                     System.IO.Directory.Delete(folder, true);
                     System.IO.File.Delete(manif);
                     if (notif)
-                        NotificationNow(BuildInfo.Name, $"Deleted {PalletNow?.name}.", NotificationType.ERROR, 3.0f);
+                        NotificationNow(JRLibraryInfo.LibraryName, $"Deleted {PalletNow?.name}.", NotificationType.ERROR, 3.0f);
                 }
             }
         }
@@ -1307,7 +1361,7 @@ namespace FusionLibrary
             if (openSelectionPc && System.IO.Directory.Exists(folderPath))
             {
                 System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{folderPath}\"");
-                NotificationNow(BuildInfo.Name, $"Opened {palletTitle} download folder.", NotificationType.SUCCESS, 2f);
+                NotificationNow(JRLibraryInfo.LibraryName, $"Opened {palletTitle} download folder.", NotificationType.SUCCESS, 2f);
             }
 
             return (folderPath, pallet.ManifestPath, pallet.PalletPath, pallet);
@@ -1315,32 +1369,6 @@ namespace FusionLibrary
         //
 
 
-        //hide holsters for specific players
-        public static void HolsterHiderAll(NetworkPlayer playerTodo, bool activeNow = false)
-        {
-            var rig = playerTodo != null
-                ? playerTodo.RigRefs?.RigManager?.physicsRig
-                : Player.RigManager?.physicsRig;
-
-            if (rig == null) return;
-
-            void Toggle(Transform root, string path)
-            {
-                if (root == null) return;
-                var t = root.Find(path);
-                if (t == null) return;
-                var mr = t.GetComponent<UnityEngine.MeshRenderer>();
-                mr?.gameObject.SetActive(activeNow);
-            }
-
-            Toggle(rig.m_spine?.transform, "SideRt/prop_handGunHolster/strap_geo");
-            Toggle(rig.m_spine?.transform, "SideRt/prop_handGunHolster/handgunHolster_geo");
-            Toggle(rig.m_spine?.transform, "SideLf/prop_handGunHolster/strap_geo");
-            Toggle(rig.m_spine?.transform, "SideLf/prop_handGunHolster/handgunHolster_geo");
-            Toggle(rig.m_pelvis?.transform, "BeltLf1/InventoryAmmoReceiver/Holder");
-            Toggle(rig.m_pelvis?.transform, "BeltRt1/InventoryAmmoReceiver/Holder");
-            Toggle(rig.m_pelvis?.transform, "BackCt/prop_pouch");
-        }
         //just reads and outputs your current modio token to a string
         public static string? ReadModIOToken()
         {
@@ -1484,9 +1512,88 @@ namespace FusionLibrary
 
             return LocalPlayer.Metadata.Metadata;
         }
-    
-    
-    
-    
+        
+        //returns the current fusion global ban list fetches from the github
+        public static void BanListChecking(Action<GlobalBanList> callback)
+        {
+            MelonCoroutines.Start(ReadFromSite(
+                "https://raw.githubusercontent.com/Lakatrazz/Fusion-Lists/refs/heads/main/globalBans.json",
+                (siteText) =>
+                {
+                    if (string.IsNullOrEmpty(siteText))
+                    {
+                        MelonLogger.Error("Failed to download global ban list.");
+                        callback?.Invoke(null);
+                        return;
+                    }
+
+                    try
+                    {
+                        JsonSerializerOptions options = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true,
+                            NumberHandling = JsonNumberHandling.AllowReadingFromString
+                        };
+                        GlobalBanList banList = JsonSerializer.Deserialize<GlobalBanList>(siteText, options);
+
+                        if (banList?.Bans == null)
+                        {
+                            MelonLogger.Error("Global ban list is invalid.");
+                            callback?.Invoke(null);
+                            return;
+                        }
+
+                        MelonLogger.Msg($"Total Fusion Global Bans: {banList.Bans.Count}");
+
+                        callback?.Invoke(banList);
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"Failed to deserialize GlobalBanList: {ex}");
+                        callback?.Invoke(null);
+                    }
+                }));
+        }
+        
+        //returns if your banned or not from fusion (NEED TO USE THIS after you logged into steam layer and such)
+        public static void AreYouBannedFromFusion(Action<bool> callback)
+        {
+            MelonCoroutines.Start(ReadFromSite("https://raw.githubusercontent.com/Lakatrazz/Fusion-Lists/refs/heads/main/globalBans.json", (siteText) =>
+            {
+                if (string.IsNullOrEmpty(siteText))
+                {
+                    callback(false);
+                    return;
+                }
+
+                try
+                {
+                    JsonSerializerOptions options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        NumberHandling = JsonNumberHandling.AllowReadingFromString
+                    };
+                    GlobalBanList banList = JsonSerializer.Deserialize<GlobalBanList>(siteText, options);
+
+                    if (banList?.Bans == null)
+                    {
+                        MelonLogger.Warning("Ban list missing.");
+                        callback(false);
+                        return;
+                    }
+
+                    bool banned = banList.Bans.Any(b =>
+                        b?.Platforms != null &&
+                        b.Platforms.Any(p => p.PlatformID == SteamIdYours())
+                    );
+                    callback(banned);
+                }
+                catch (Exception ex)
+                {
+                    callback(false);
+                }
+            }));
+        }
+
     }
 }

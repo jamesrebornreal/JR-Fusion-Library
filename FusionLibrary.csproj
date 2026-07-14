@@ -17,6 +17,7 @@
 
     <!-- Documentation -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <RootNamespace />
   </PropertyGroup>
 
 
