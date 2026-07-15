@@ -1,5 +1,6 @@
 ﻿using BoneLib;
 using FusionLibrary;
+using HarmonyLib;
 using Il2CppSLZ.Bonelab;
 using Il2CppSLZ.Bonelab.SaveData;
 using Il2CppSLZ.Marrow;
@@ -9,8 +10,10 @@ using Il2CppSLZ.Marrow.Interaction;
 using Il2CppSLZ.Marrow.Pool;
 using Il2CppSLZ.Marrow.PuppetMasta;
 using Il2CppSLZ.Marrow.SaveData;
+using Il2CppSLZ.Marrow.SceneStreaming;
 using Il2CppSLZ.Marrow.VFX;
 using Il2CppSLZ.Marrow.Warehouse;
+using Il2CppSystem.Runtime.Remoting.Messaging;
 using Il2CppSystem.Text.RegularExpressions;
 using LabFusion.Data;
 using LabFusion.Downloading;
@@ -26,7 +29,10 @@ using LabFusion.RPC;
 using LabFusion.Safety;
 using LabFusion.Scene;
 using LabFusion.SDK.Metadata;
+using LabFusion.SDK.Points;
+using LabFusion.Senders;
 using LabFusion.UI.Popups;
+using LabFusion.Utilities;
 using MelonLoader;
 using Newtonsoft.Json.Linq;
 using System.Collections;
@@ -532,7 +538,10 @@ namespace FusionLibrary
 
     public class LibraryCode : MelonMod
     {
-
+        //returns the text currently on your clipboard
+        public static string ClipBoardText() { 
+            return GUIUtility.systemCopyBuffer;
+        }
         //returns active hand
         public static Hand JR_YourGetHand(WhichHand hand)
         {
@@ -583,6 +592,7 @@ namespace FusionLibrary
 
             request.Dispose(); // If available
         }
+
 
         //magazine checkers (attempt could be better but it is where its at right now which is fine for me :) )
         public static bool IsMagazine(SpawnableCrateReference reffy)
@@ -678,7 +688,6 @@ namespace FusionLibrary
         //
 
 
-        
         //strip colors from names to prevent weird html related stuff
         public static string StripColorTags(string input)
         {
@@ -1120,6 +1129,19 @@ namespace FusionLibrary
                 });
             }
         }
+        //despawns all matching a specific barcode
+        public static void DespawnAllMatchingBarcode(string barcode)
+        {
+            foreach(var Netentity in NetworkEntities())
+            {
+                if (Netentity.JR_GetMarrowEntity().JR_GetBarcodeID() == barcode)
+                {
+                    DespawnNow(Netentity);
+                }
+            }
+        }
+
+        
         //this looksup information about a specific #modioID
         private static bool _isLookingUpMod = false;
         public static IEnumerator ModioInfo(int modIOID, Action<ModCallbackInfo> onFinished)
@@ -1232,6 +1254,8 @@ namespace FusionLibrary
             }
         }
         //is the float value within two values returns true if so used to mainly parse serialized stats but can be used for anything you need
+        
+        
         public static bool Iswithintwovalues(float valuetocheck, float min, float max)
         {
             if (valuetocheck >= min && valuetocheck <= max)
@@ -1305,10 +1329,23 @@ namespace FusionLibrary
                 }
             }
         }
+        //returns the barcode currently in hand left or right you can assign it
+        public static string BarcodeInHand(WhichHand hand)
+        {
+            return JR_YourGetHand(hand)?
+                .JR_GetMarrowEntity()?
+                .JR_GetBarcodeID() ?? string.Empty;
+        }
         //returns the barcode currently in both hands
-        public static string BarcodeInHand() => JR_YourGetHand(WhichHand.Left)?.JR_GetMarrowEntity()?.JR_GetBarcodeID() ?? JR_YourGetHand(WhichHand.Right)?.JR_GetMarrowEntity()?.JR_GetBarcodeID() ?? string.Empty;
-        
-        
+        public static string BarcodesInBothHands()
+        {
+            string leftHand = BarcodeInHand(WhichHand.Left);
+            string rightHand = BarcodeInHand(WhichHand.Right);
+
+            return $"Left Hand: {leftHand} | Right Hand: {rightHand}";
+        }
+
+
         //unloads and uninstalls mod by pallet
         public static void DeleteModioMod(Pallet PalletNow, bool notif = true)
         {
@@ -1512,7 +1549,6 @@ namespace FusionLibrary
 
             return LocalPlayer.Metadata.Metadata;
         }
-        
         //returns the current fusion global ban list fetches from the github
         public static void BanListChecking(Action<GlobalBanList> callback)
         {
@@ -1554,7 +1590,6 @@ namespace FusionLibrary
                     }
                 }));
         }
-        
         //returns if your banned or not from fusion (NEED TO USE THIS after you logged into steam layer and such)
         public static void AreYouBannedFromFusion(Action<bool> callback)
         {
@@ -1594,6 +1629,89 @@ namespace FusionLibrary
                 }
             }));
         }
+
+
+        //use this to get the list of players that you have met
+        public static readonly HashSet<PlayerInfo> RecentlyMetPlayers = [];
+        [HarmonyPatch(typeof(SteamNetworkLayer), "OnPlayerJoin")]
+        [HarmonyPriority(int.MaxValue - 1)]
+        private static class RecentlyMetPlayersHook
+        {
+            private static void Postfix(PlayerID id)
+            {
+                if (id != null && !RecentlyMetPlayers.Any(p => p?.PlatformID == id.PlatformID))
+                {
+                    RecentlyMetPlayers.Add(new PlayerInfo
+                    {
+                        Nickname = id.Metadata.Nickname.GetValue(),
+                        Username = id.Metadata.Username.GetValue(),
+                        PlatformID = id.PlatformID,
+                        AvatarModID = id.Metadata.AvatarModID.GetValue(),
+                        AvatarTitle = id.Metadata.AvatarTitle.GetValue(),
+                        Description = id.Metadata.Description.GetValue()
+                    });
+                }
+            }
+        }
+
+
+        //unequips all cosmetics 
+        public static void UnequipAllFusionCosmetics()
+        {
+            foreach (var equipped in JR_YourNetworkPlayer().PlayerID.EquippedItems)
+            {
+                PointSaveManager.SetEquipped(equipped, false);
+                PointItemSender.SendPointItemEquip(equipped, false);
+            }
+
+            PointItemManager.UnequipAll();
+        }
+        //returns list of active cosmetics on your player (barcodes)
+        public static List<string> JR_Cosmetics() { return JR_YourNetworkPlayer().PlayerID.EquippedItems; }
+        //sets your nickname
+        public static void JR_SetYourNickName(string newnickname) => JR_YourMetaData().TrySetMetadata("Nickname", newnickname);
+        //sets your username
+        public static void JR_SetYourUsername(string newusername) => JR_YourMetaData().TrySetMetadata("Username", newusername);
+        //sets your description
+        public static void JR_SetYourDescription(string newdescription) => JR_YourMetaData().TrySetMetadata("Description", newdescription);
+        //loads into new map with barcode supports fusion&singleplayer
+        public static void LoadIntoMap(string LevelBarCode)
+        {
+            if (NetworkInfo.IsHost && NetworkInfo.HasServer)
+            {
+                NetworkHelper.Disconnect();
+                SceneStreamer.Load(new LevelCrateReference(LevelBarCode).Barcode);
+            }
+            else
+            {
+                SceneStreamer.Load(new LevelCrateReference(LevelBarCode).Barcode);
+            }
+        }
+        //returns the info of the last person who did damage to you
+        public static PlayerID? LastFusionAttacker()
+        {
+            if (!FusionPlayer.TryGetLastAttacker(out PlayerID attacker))
+                return null;
+
+            return attacker.Metadata != null ? attacker : null;
+        }
+        //adds holding item to save game favorites (adds it to the favorites tab in the spawngunui)
+        public static void AddHoldingItemToSaveGameFavorites(WhichHand CurrentHand)
+        {
+            if (!DataManager.ActiveSave.PlayerSettings.FavoriteSpawnables.Contains(BarcodeInHand(CurrentHand).Trim()))
+            {
+                DataManager.ActiveSave.PlayerSettings.FavoriteSpawnables.Add(BarcodeInHand(CurrentHand).Trim());
+                DataManager.TrySaveActiveSave(SaveFlags.Complete);
+                NotificationNow(JRLibraryInfo.LibraryName, $"Added {BarcodeInHand(CurrentHand).JR_BarcodePalletName()} To SaveGame Favorites!", NotificationType.SUCCESS);
+            }
+            else
+            {
+                DataManager.ActiveSave.PlayerSettings.FavoriteSpawnables.Remove(BarcodeInHand(CurrentHand).Trim());
+                DataManager.TrySaveActiveSave(SaveFlags.Complete);
+                NotificationNow(JRLibraryInfo.LibraryName, $"Removed {BarcodeInHand(CurrentHand).JR_BarcodePalletName()} From SaveGame Favorites!", NotificationType.SUCCESS);
+            }
+        }
+
 
     }
 }
