@@ -4,7 +4,7 @@ A focused library designed to make Fusion mod development easier, faster, and mo
 
 ## About
 
-Fusion Library is a collection of useful functions and utilities originally developed for **Fusion Protector**. The library has been cleaned up, refined, and made publicly accessible so developers can reference it, build upon it, and create their own mods for Fusion.
+Fusion Library is a collection of useful functions and utilities originally developed for **Fusion Protector** & Past Projects. The library has been cleaned up, refined, and made publicly accessible so developers can reference it, build upon it, and create their own mods for Fusion.
 
 While I no longer actively play Fusion, I wanted to give back to the community by sharing tools that can help other developers create better experiences, experiment with new ideas, and make mod development more approachable.
 
