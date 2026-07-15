@@ -51,14 +51,10 @@ namespace FusionLibrary
 
         public const string LibraryName = "JR Fusion Library";
         public const string LibraryCreator = "James Reborn";
-        public const string Version = "1.0.0";
+        public const string Version = "1.0.1";
 
     }
-    public enum handnow
-    {
-        Left,
-        Right
-    }
+
     public enum WhichHand
     {
         Both,
